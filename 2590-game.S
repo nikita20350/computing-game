@@ -13,7 +13,8 @@
   @ Definitions are in definitions.s to keep this file "clean"
   #include "definitions.S"
 
-  .equ    BLINK_PERIOD, 600 
+  .equ    BLINK_PERIOD, 100 
+  .equ    ANSWER_COUNTDOWN, 2000
   .equ    a, 5
   .equ    c, 1
   .equ    m, 8
@@ -48,6 +49,10 @@ Main:
   LDR     R4, =blink_countdown
   LDR     R5, =0
   STR     R5, [R4]  
+
+  LDR   R4, =answer_countdown
+  LDR   R5, =ANSWER_COUNTDOWN
+  STR   R5, [R4]
 
   LDR   R4, =i
   MOV   R5, #0
@@ -89,6 +94,9 @@ Main:
   LDR   R4, =button_count             @ count = 0;
   MOV   R5, #0                        @
   STR   R5, [R4]                      @
+  LDR   R4, =waiting_for_user
+  MOV   R5, #0
+  STR   R5, [R4]
 
   @ Configure USER pushbutton (GPIO Port A Pin 0 on STM32F3 Discovery
   @   kit) to use the EXTI0 external interrupt signal
@@ -139,6 +147,31 @@ SysTick_Handler:
 
   PUSH  {R4-R7, LR}
 
+  LDR   R4, =waiting_for_user
+  LDR   R5, [R4]
+  CMP   R5, #1
+  BNE   .LcheckGame
+  LDR   R4, =answer_countdown
+  LDR   R5, [R4]
+  CMP   R5, #0
+  BEQ   .LendAnswerCount
+  SUB   R5, R5, #1
+  STR   R5, [R4]
+  B     .LretSystick
+.LendAnswerCount:
+  ADD   R0, R0, #1
+  LDR   R4, =answer_countdown
+  LDR   R5, =ANSWER_COUNTDOWN
+  STR   R5, [R4]
+  LDR   R4, =waiting_for_user
+  MOV   R5, #0
+  STR   R5, [R4]
+  LDR   R4, =button_count
+  MOV   R5, #0
+  STR   R5, [R4]
+  B     .LretSystick
+  @ Check how many times button was pressed
+.LcheckGame:
   LDR   R4, =game_started
   LDR   R5, [R4]
   CMP   R5, #0
@@ -244,6 +277,10 @@ SysTick_Handler:
   MOV   R5, #0
   STR   R5, [R4]
 
+  LDR   R4, =waiting_for_user
+  MOV   R5, #1
+  STR   R5, [R4]
+
   LDR   R4, =pressed_time
   MOV   R5, #0
   STR   R5, [R4]
@@ -273,19 +310,42 @@ EXTI0_IRQHandler:
 
   PUSH  {R4-R7,LR}
 
+
+
+
   LDR   R4, =button_is_pressed
   LDR   R5, [R4]
 
   CMP   R5, #0                      @ if (!button_is_pressed) {
   BNE   .LnotReset
+
+  LDR   R6, =waiting_for_user
+  LDR   R7, [R6]
+  CMP   R7, #1
+  BNE   .LendIfWaiting
+
+  EOR   R5, #1
+  STR   R5, [R4]
+
+  LDR   R4, =button_count           @ count = count + 1
+  LDR   R5, [R4]                    @
+  ADD   R5, R5, #1                  @
+  STR   R5, [R4]                    @
+  B     .LretSystick
+.LendIfWaiting:
+
   LDR   R6, =pressed_time
   MOV   R7, #0
   STR   R7, [R6]                    @   pressed_time = 0
 .LnotReset:                         @ }
 
+  LDR   R6, =waiting_for_user
+  LDR   R7, [R6]
+  CMP   R7, #1
+
   EOR   R5, #1                      @ button_is_pressed = !button_is_pressed
   STR   R5, [R4]
-
+  BEQ   .LretSystick
 
   LDR   R4, =SYSTICK_VAL
   LDR   R5, [R4]
@@ -294,11 +354,7 @@ EXTI0_IRQHandler:
   LDR   R4, =random_value
   STR   R5, [R4]
 
-  LDR   R4, =button_count           @ count = count + 1
-  LDR   R5, [R4]                    @
-  ADD   R5, R5, #1                  @
-  STR   R5, [R4]                    @
-
+.LretButtonHandler:
   LDR   R4, =EXTI_PR                @ Clear (acknowledge) the interrupt
   MOV   R5, #(1<<0)                 @
   STR   R5, [R4]                    @
@@ -315,11 +371,17 @@ button_count:
 blink_countdown:
   .space  4
 
+answer_countdown:
+  .space  4
+
 random_value:
   .space  4
 
 game_started:
   .space  4
+
+waiting_for_user:
+  .space 4
 
 button_is_pressed:
   .space  4

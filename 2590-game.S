@@ -14,7 +14,7 @@
   #include "definitions.S"
 
   .equ    BLINK_PERIOD, 100 
-  .equ    ANSWER_COUNTDOWN, 2000
+  .equ    ANSWER_COUNTDOWN, 5000
   .equ    a, 5
   .equ    c, 1
   .equ    m, 8
@@ -159,6 +159,12 @@ SysTick_Handler:
   STR   R5, [R4]
   B     .LretSystick
 .LendAnswerCount:
+
+  @  CHECK IF RIGHT ANSWER HERE
+  @  + SHOW THE NEXT ROUND CAN BE STARTED
+  @  (OR MAYBE NOT, JUST SHOW IF YOU ARE RIGHT, and that is 
+  @ when the next round can be started)
+
   ADD   R0, R0, #1
   LDR   R4, =answer_countdown
   LDR   R5, =ANSWER_COUNTDOWN
@@ -331,7 +337,7 @@ EXTI0_IRQHandler:
   LDR   R5, [R4]                    @
   ADD   R5, R5, #1                  @
   STR   R5, [R4]                    @
-  B     .LretSystick
+  B     .LretButtonHandler
 .LendIfWaiting:
 
   LDR   R6, =pressed_time
@@ -345,7 +351,7 @@ EXTI0_IRQHandler:
 
   EOR   R5, #1                      @ button_is_pressed = !button_is_pressed
   STR   R5, [R4]
-  BEQ   .LretSystick
+  BEQ   .LretButtonHandler
 
   LDR   R4, =SYSTICK_VAL
   LDR   R5, [R4]

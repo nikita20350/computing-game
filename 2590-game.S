@@ -91,9 +91,9 @@ Main:
   @
 
   @ Initialise count to zero
-  LDR   R4, =button_count             @ count = 0;
-  MOV   R5, #0                        @
-  STR   R5, [R4]                      @
+  LDR   R4, =button_count           @ count = 0;
+  MOV   R5, #0                      @
+  STR   R5, [R4]                    @
   LDR   R4, =waiting_for_user
   MOV   R5, #0
   STR   R5, [R4]

@@ -14,8 +14,10 @@
   #include "definitions.S"
 
   .equ    BLINK_PERIOD, 500
-  .equ    ANSWER_COUNTDOWN, 5000
+  .equ    ANSWER_COUNTDOWN, 7500
   .equ    BLINK_PERIOD_ANSWER, ANSWER_COUNTDOWN / 8
+  .equ    SLEEP_PERIOD, 1000
+  .equ    SHOW_ROUND_PERIOD, 1000
   .equ    a, 5
   .equ    c, 1
   .equ    m, 8
@@ -56,6 +58,10 @@ Main:
 
   LDR   R4, =answer_countdown
   LDR   R5, =ANSWER_COUNTDOWN
+  STR   R5, [R4]
+
+  LDR   R4, =sleep_countdown
+  MOV   R5, #0
   STR   R5, [R4]
 
   LDR   R4, =i
@@ -138,105 +144,53 @@ Main:
 End_Main:
   POP   {R4-R5,PC}
 
-
-
 @
 @ SysTick interrupt handler (blink LED LD3)
 @
   .type  SysTick_Handler, %function
 SysTick_Handler:
-
   PUSH  {R4-R7, LR}
-  @ LDR   R4, =round_lights_flashing
-  @ LDR   R4, [R4]                      // this is the end of round lights flashing
-  @ CMP   R4, #1 
-  @ BNE   .LroundLightsNotFlashing
-  @ LDR   R4, =i
-  @ LDR   R5, [R4]
-  @ LDR   R4, =round_n
-  @ LDR   R7, [R4]
-  @ CMP   R5, R7
-  @ BGE   .LendRoundFlash
 
-  @ LDR   R4, =GPIOE_ODR
-  @ LDR   R5, [R4]
-  @ ORR   R5, #(0b1 << LD6_PIN)
-  @ ORR   R5, #(0b1 << LD7_PIN)
-  @ STR   R5, [R4]
-  @ LDR   R4, =i
-  @ LDR   R5, [R4]
-  @ ADD   R5, R5, #1
-  @ STR   R5, [R4]
-  @ B     .LretSystick
-@ .LendRoundFlash:
-@   LDR   R4, =round_lights_flashing
-@   LDR   R5, =0
-@   STR   R5, [R4]
-@   B     .LretSystick
-@  .LroundLightsNotFlashing:
+  LDR   R4, =sleep_countdown
+  LDR   R5, [R4]
+  CMP   R5, #0
+  BLE   .LendIfSleeping
+
+  SUB   R5, R5, #1
+  STR   R5, [R4]
+  B     .LretSystick
+.LendIfSleeping:
+
+  LDR   R4, =show_round
+  LDR   R5, [R4]
+  CMP   R5, #0
+  BEQ   .LendIfShowRound
+
+  LDR   R4, =show_round_countdown
+  LDR   R5, [R4]
+  CMP   R5, #0
+  BEQ   .LelseStopShowRound
+  SUB   R5, R5, #1
+  STR   R5, [R4]
+  B     .LendIfStopShowRound
+.LelseStopShowRound:
+  BL    clear_lights
+  LDR   R4, =show_round
+  MOV   R5, #0
+  STR   R5, [R4]
+  LDR   R4, =sleep_countdown
+  LDR   R5, =SLEEP_PERIOD
+  STR   R5, [R4]
+.LendIfStopShowRound:
+  B     .LretSystick
+.LendIfShowRound:
+
   LDR   R4, =waiting_for_user           @ if(waitingForUser)
   LDR   R5, [R4]                        @ {
   CMP   R5, #1
   BNE   .LcheckGame
-  LDR   R4, =answer_countdown           @   if(answer_countdown != 0)
-  LDR   R5, [R4]                        @   {
-  CMP   R5, #0   
-  BEQ   .LendAnswerCount                @
-  SUB   R5, R5, #1                      @     answerCountdown -= 1;
-  STR   R5, [R4]                        @
-  @ INDICATE TIME LEFT WITH LIGHTS
-  @ temp = ANSWER_COUNTDOWN - BL_PER_ANS
-  @ if answer countdown >= temp:
-  @  light up
-  @ else temp -= BL_PER_ANS
-  @ if answer countdown >= temp
-  
-  B     .LretSystick                    @   }     // acknowledge the sysTickInterrupt
-.LendAnswerCount:                       @   else  {
-  @  CHECK IF RIGHT ANSWER HERE
-  @  + SHOW THE NEXT ROUND CAN BE STARTED
-  @  (OR MAYBE NOT, JUST SHOW IF YOU ARE RIGHT, and that is 
-  @ when the next round can be started)
-
-
-  LDR   R4, =random_value
-  LDR   R5, [R4]
-  LDR   R4, =button_count
-  LDR   R6, [R4]
-  CMP   R5, R6
-  BNE  .LelseGameWrong
-  LDR   R4, =GPIOE_ODR
-  LDR   R5, [R4]
-  ORR   R5, #(0b1 << LD6_PIN)
-  ORR   R5, #(0b1 << LD7_PIN)
-  STR   R5, [R4]
-  @ LDR   R4, =round_lights_flashing
-  @ MOV   R5, #1
-  @ STR   R5, [R4]
-  LDR   R4, =round_n
-  LDR   R7, [R4]
-  ADD   R7, R7, #1
-  STR   R7, [R4]
-  B     .LendIfGameWrong
-.LelseGameWrong:
-  LDR   R4, =GPIOE_ODR
-  LDR   R5, [R4]
-  ORR   R5, #(0b1 << LD3_PIN)
-  ORR   R5, #(0b1 << LD10_PIN)
-  STR   R5, [R4]
-.LendIfGameWrong:
-
-  LDR   R4, =answer_countdown
-  LDR   R5, =ANSWER_COUNTDOWN
-  STR   R5, [R4]
-  LDR   R4, =waiting_for_user           @     // waiting_for_user = 0;
-  MOV   R5, #0
-  STR   R5, [R4]
-  LDR   R4, =button_count               @     // reset button count
-  MOV   R5, #0
-  STR   R5, [R4]
+  BL    wait_for_user
   B     .LretSystick                    @ }
-  @ Check how many times button was pressed
 .LcheckGame:                            @ else {
   LDR   R4, =game_started               @   if(game_started == 0)   // !game_started
   LDR   R5, [R4]                        @   {
@@ -282,6 +236,15 @@ SysTick_Handler:
   LDR   R4, =game_started       @ game_started = 1
   MOV   R5, #1
   STR   R5, [R4]
+
+  BL    glow_round_number
+  LDR   R4, =show_round
+  MOV   R5, #1
+  STR   R5, [R4]
+  LDR   R4, =show_round_countdown
+  LDR   R5, =SHOW_ROUND_PERIOD
+  STR   R5, [R4]
+@   BL    clear_lights            @ clear_lights()
 .LendIfPressed:                 @ }
   B     .LretSystick
 .LelseGameStarted:
@@ -314,14 +277,12 @@ SysTick_Handler:
   MOV   R6, #1                  @ get current light bit
   LSL   R6, R6, R7                  @ 
 
+  BL    clear_lights            @ clear_lights()
+
   LDR   R4, =GPIOE_ODR
   LDR   R5, [R4]
-  LDR   R7, =0xff00             @ turn off all lights
-  BIC   R5, R7                  @
-
   ORR   R5, R6                  @ turn on current light
   STR   R5, [R4]                @
-
 
   LDR   R4, =i
   LDR   R5, [R4]
@@ -333,11 +294,7 @@ SysTick_Handler:
   MOV   R5, #0
   STR   R5, [R4]
 
-  LDR   R4, =GPIOE_ODR
-  LDR   R5, [R4]
-  LDR   R7, =0xff00             @ turn off all lights
-  BIC   R5, R7                  @
-  STR   R5, [R4]                @
+  BL    clear_lights            @ clear_lights()
 
   LDR   R4, =game_started
   MOV   R5, #0
@@ -349,6 +306,10 @@ SysTick_Handler:
 
   LDR   R4, =pressed_time
   MOV   R5, #0
+  STR   R5, [R4]
+
+  LDR   R4, =sleep_countdown
+  LDR   R5, =SLEEP_PERIOD
   STR   R5, [R4]
 .LskipResetGame:
   LDR   R4, =blink_countdown      @   countdown = BLINK_PERIOD;
@@ -384,9 +345,6 @@ SysTick_Handler:
 EXTI0_IRQHandler:
 
   PUSH  {R4-R7,LR}
-
-
-
 
   LDR   R4, =button_is_pressed
   LDR   R5, [R4]
@@ -437,33 +395,154 @@ EXTI0_IRQHandler:
   @ Return from interrupt handler
   POP  {R4-R7,PC}
 
+clear_lights:
+  PUSH {R4-R6,LR}
+
+  LDR   R4, =GPIOE_ODR
+  LDR   R5, [R4]
+  LDR   R6, =0xff00             @ turn off all lights
+  BIC   R5, R6
+  STR   R5, [R4]
+
+  POP  {R4-R6,PC}
+glow_win:
+  PUSH  {R4-R5,LR}
+
+  LDR   R4, =GPIOE_ODR
+  LDR   R5, [R4]
+  ORR   R5, #(0b1 << LD6_PIN)
+  ORR   R5, #(0b1 << LD7_PIN)
+  STR   R5, [R4]
+
+  POP   {R4-R5,PC}
+glow_lose:
+  PUSH  {R4-R5,LR}
+
+  LDR   R4, =GPIOE_ODR
+  LDR   R5, [R4]
+  ORR   R5, #(0b1 << LD3_PIN)
+  ORR   R5, #(0b1 << LD10_PIN)
+  STR   R5, [R4]
+
+  POP   {R4-R5,PC}
+glow_round_number:
+  PUSH  {R4-R6,LR}
+
+  BL    clear_lights
+  LDR   R4, =round_n
+  LDR   R6, [R4]
+  RSB   R6, R6, #6
+
+  CMP   R6, #0
+  BGE   .LendIfLargeRound
+  MOV   R6, #0
+.LendIfLargeRound:
+
+  LDR   R4, =circle_bit_patterns
+  LDRH  R6, [R4, R6, LSL #1]
+  LDR   R5, =0xff00
+  EOR   R6, R5
+  
+  LDR   R4, =GPIOE_ODR
+  LDR   R5, [R4]
+  ORR   R5, R6
+  STR   R5, [R4]
+
+  POP   {R4-R6,PC}
+
+reset_awaiting_answer:
+  PUSH  {R4-R5,LR}
+
+  LDR   R4, =answer_countdown           @ answer_coundown = ANSWER_COUNTDOWN
+  LDR   R5, =ANSWER_COUNTDOWN
+  STR   R5, [R4]
+  LDR   R4, =waiting_for_user           @ waiting_for_user = 0
+  MOV   R5, #0
+  STR   R5, [R4]
+  LDR   R4, =button_count               @ button_count = 0
+  MOV   R5, #0
+  STR   R5, [R4]
+
+  POP   {R4-R5,PC}
+
+wait_for_user:
+  PUSH  {R4-R6,LR}
+
+  LDR   R4, =answer_countdown           @   if(answer_countdown != 0)
+  LDR   R5, [R4]                        @   {
+  CMP   R5, #0   
+  BEQ   .LendAnswerCount                @
+  SUB   R5, R5, #1                      @     answerCountdown -= 1;
+  STR   R5, [R4]                        @
+
+  BL    clear_lights
+
+  LDR   R6, =BLINK_PERIOD_ANSWER
+  UDIV  R6, R5, R6
+  LDR   R4, =circle_bit_patterns
+  LDRH  R6, [R4, R6, LSL#1]
+  
+  LDR   R4, =GPIOE_ODR
+  LDR   R5, [R4]
+  ORR   R5, R6
+  STR   R5, [R4]
+
+  B     .LretWaitForUser
+.LendAnswerCount:
+  BL    clear_lights
+  LDR   R4, =random_value               @ if (button_count = random_value)
+  LDR   R5, [R4]
+  LDR   R4, =button_count
+  LDR   R6, [R4]
+  CMP   R5, R6
+  BNE   .LelseGameWrong
+  BL    glow_win                       @ glow_win
+  LDR   R4, =round_n        
+  LDR   R5, [R4]
+  ADD   R5, R5, #1
+  STR   R5, [R4]
+  B     .LendIfGameWrong
+.LelseGameWrong:
+  BL    glow_lose
+.LendIfGameWrong:
+  BL    reset_awaiting_answer
+
+.LretWaitForUser:
+  POP   {R4-R6,PC}
 
   .section .data
   
+circle_bit_patterns:
+  .hword 0b0000010000000000
+  .hword 0b0000110000000000
+  .hword 0b0001110000000000
+  .hword 0b0011110000000000
+  .hword 0b0111110000000000
+  .hword 0b1111110000000000
+  .hword 0b1111110100000000
+  .hword 0b1111111100000000
 button_count:
   .space  4
-
 blink_countdown:
   .space  4
-
 answer_countdown:
   .space  4
-
+sleep_countdown:
+  .space 4
+show_round_countdown:
+  .space 4
 random_value:
   .space  4
-
 game_started:
   .space  4
-
+show_round:
+  .space 4
 waiting_for_user:
   .space 4
-
 button_is_pressed:
   .space  4
-
 pressed_time:
   .space  4
-
 a:
   .space  4
 c:
@@ -475,7 +554,5 @@ random_lights:
 i:
   .space 4
 round_n:
-  .space 4
-round_lights_flashing:
   .space 4
   .end

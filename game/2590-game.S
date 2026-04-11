@@ -13,7 +13,7 @@
   @ Definitions are in definitions.s to keep this file "clean"
   #include "definitions.S"
 
-  .equ    BLINK_PERIOD, 500
+  .equ    BLINK_PERIOD, 800
   .equ    ANSWER_COUNTDOWN, 7500
   .equ    BLINK_PERIOD_ANSWER, ANSWER_COUNTDOWN / 8
   .equ    SLEEP_PERIOD, 1000
@@ -151,180 +151,179 @@ End_Main:
 SysTick_Handler:
   PUSH  {R4-R7, LR}
 
-  LDR   R4, =sleep_countdown
-  LDR   R5, [R4]
-  CMP   R5, #0
-  BLE   .LendIfSleeping
-
-  SUB   R5, R5, #1
-  STR   R5, [R4]
-  B     .LretSystick
-.LendIfSleeping:
-
-  LDR   R4, =show_round
-  LDR   R5, [R4]
-  CMP   R5, #0
-  BEQ   .LendIfShowRound
-
-  LDR   R4, =show_round_countdown
-  LDR   R5, [R4]
-  CMP   R5, #0
-  BEQ   .LelseStopShowRound
-  SUB   R5, R5, #1
-  STR   R5, [R4]
-  B     .LendIfStopShowRound
-.LelseStopShowRound:
-  BL    clear_lights
-  LDR   R4, =show_round
-  MOV   R5, #0
-  STR   R5, [R4]
-  LDR   R4, =sleep_countdown
-  LDR   R5, =SLEEP_PERIOD
-  STR   R5, [R4]
-.LendIfStopShowRound:
-  B     .LretSystick
-.LendIfShowRound:
-
-  LDR   R4, =waiting_for_user           @ if(waitingForUser)
-  LDR   R5, [R4]                        @ {
+  LDR   R4, =sleep_countdown        @ if (sleep_countdown > 0) {
+  LDR   R5, [R4]                    @ 
+  CMP   R5, #0                      @
+  BLE   .LendIfSleeping             @
+                                    @
+  SUB   R5, R5, #1                  @   sleep_countdown -= 1
+  STR   R5, [R4]                    @   return;
+  B     .LretSystick                @
+.LendIfSleeping:                    @ }
+                                    @
+  LDR   R4, =show_round             @ if (show_round) {
+  LDR   R5, [R4]                    @
+  CMP   R5, #0                      @
+  BEQ   .LendIfShowRound            @
+                                    @
+  LDR   R4, =show_round_countdown   @   if (show_round_countdown > 0) {
+  LDR   R5, [R4]                    @
+  CMP   R5, #0                      @
+  BLE   .LelseStopShowRound         @
+  SUB   R5, R5, #1                  @       show_round_countdown -= 1
+  STR   R5, [R4]                    @
+  B     .LendIfStopShowRound        @
+.LelseStopShowRound:                @   } else {
+  BL    clear_lights                @       clear_lights()
+  LDR   R4, =show_round             @       show_round = false
+  MOV   R5, #0                      @
+  STR   R5, [R4]                    @
+  LDR   R4, =sleep_countdown        @       sleep_countdown = SLEEP_PERIOD
+  LDR   R5, =SLEEP_PERIOD           @
+  STR   R5, [R4]                    @
+.LendIfStopShowRound:               @   }
+  B     .LretSystick                @   return
+.LendIfShowRound:                   @ }
+                                    @
+  LDR   R4, =waiting_for_user       @ if(waitingForUser)
+  LDR   R5, [R4]                    @ {
   CMP   R5, #1
   BNE   .LcheckGame
   BL    wait_for_user
-  B     .LretSystick                    @ }
-.LcheckGame:                            @ else {
-  LDR   R4, =game_started               @   if(game_started == 0)   // !game_started
-  LDR   R5, [R4]                        @   {
-  CMP   R5, #0                          @   
-  BNE   .LelseGameStarted
+  B     .LretSystick                @ }
+.LcheckGame:                        @ else {
+  LDR   R4, =game_started           @   if(!game_started) {
+  LDR   R5, [R4]                    @
+  CMP   R5, #0                      @   
+  BNE   .LelseGameStarted           @
+                                    @
+  LDR   R4, =button_is_pressed      @
+  LDR   R5, [R4]                    @
+  CMP   R5, #0                      @
+  BEQ   .LelseNotPressed            @   if (button_is_pressed) {
 
-  LDR   R4, =button_is_pressed
-  LDR   R5, [R4]
-  CMP   R5, #0
-  BEQ   .LelseNotPressed                @ if (button_is_pressed) {
-
-  LDR   R4, =pressed_time
-  LDR   R5, [R4]
-  ADD   R5, R5, #1                      @   pressed_time += 1
-  STR   R5, [R4]
-  B     .LendIfPressed
-.LelseNotPressed:                       @ } else {
-  LDR   R4, =pressed_time
-  LDR   R5, [R4]
-  CMP   R5, #0
-  BEQ   .LendIfPressed
-
-  MOV   R8, R5                  @   x0 = pressed_time
-  LDR   R4, =random_value
-  LDR   R5, [R4]                @   n = random_value
-
-  MOV   R6, #0                  @   
-.LwhGenLights:                  @   for (int i = 0; i < n; i++) {
+  LDR   R4, =pressed_time           @
+  LDR   R5, [R4]                    @
+  ADD   R5, R5, #1                  @       pressed_time += 1
+  STR   R5, [R4]                    @
+  B     .LendIfPressed              @
+.LelseNotPressed:                   @   } else {
+  LDR   R4, =pressed_time           @       if (pressed_time > 0)
+  LDR   R5, [R4]                    @           return
+  CMP   R5, #0                      @
+  BEQ   .LendIfPressed              @
+                                    @
+  MOV   R8, R5                      @       x0 = pressed_time
+  LDR   R4, =random_value           @
+  LDR   R5, [R4]                    @       n = random_value
+                                    @
+  MOV   R6, #0                      @   
+.LwhGenLights:                      @       for (int i = 0; i < n; i++) {
   CMP   R6, R5
   BGE   .LendWhGenLights
 
   MOV   R7, #a
-  MUL   R8, R8, R7              @       x1 = x0 * a + c
+  MUL   R8, R8, R7                  @           x1 = x0 * a + c
   ADD   R8, R8, #c
-  AND   R8, #7                  @       x1 = x1 & 7
-                                @       same as % 8
+  AND   R8, #7                      @           x1 = x1 & 7
+                                    @           same as % 8
   LDR   R7, =random_lights
-  STR   R8, [R7, R6, LSL #2]    @       word[random_lights] = x1
+  STR   R8, [R7, R6, LSL #2]        @           word[random_lights] = x1
 
-  ADD   R6, R6, #1              @       // we are remembering the sequence
+  ADD   R6, R6, #1                  @       // we are remembering the sequence
   B     .LwhGenLights
-.LendWhGenLights:               @   }
-  LDR   R4, =game_started       @ game_started = 1
-  MOV   R5, #1
-  STR   R5, [R4]
+.LendWhGenLights:                   @       }
+  LDR   R4, =game_started           @       game_started = 1
+  MOV   R5, #1                      @
+  STR   R5, [R4]                    @
+                                    @
+  BL    glow_round_number           @       glow_round_number()
+  LDR   R4, =show_round             @       show_round = true
+  MOV   R5, #1                      @
+  STR   R5, [R4]                    @
+  LDR   R4, =show_round_countdown   @       show_round_countdown = SHOW_ROUND_PERIOD
+  LDR   R5, =SHOW_ROUND_PERIOD      @
+  STR   R5, [R4]                    @
+.LendIfPressed:                     @   }
+  B     .LretSystick                @ return
+.LelseGameStarted:                  @ } else {
 
-  BL    glow_round_number
-  LDR   R4, =show_round
-  MOV   R5, #1
-  STR   R5, [R4]
-  LDR   R4, =show_round_countdown
-  LDR   R5, =SHOW_ROUND_PERIOD
-  STR   R5, [R4]
-@   BL    clear_lights            @ clear_lights()
-.LendIfPressed:                 @ }
-  B     .LretSystick
-.LelseGameStarted:
-
-  LDR   R4, =blink_countdown        @ if (countdown != 0) {
+  LDR   R4, =blink_countdown        @   if (blink_countdown != 0) {
   LDR   R5, [R4]                    @
   CMP   R5, #0                      @
   BEQ   .LelseFire                  @
 
-  SUB   R5, R5, #1                  @   countdown = countdown - 1;
+  SUB   R5, R5, #1                  @       blink_countdown = blink_countdown - 1;
   STR   R5, [R4]                    @
 
-  B     .LendIfDelay                @ }
+  B     .LendIfDelay                @   }
 
-.LelseFire:                         @ else {
+.LelseFire:                         @   else {
 
   LDR   R4, =i
-  LDR   R5, [R4]                    @ // R5: i
+  LDR   R5, [R4]                    @   // R5: i
 
   LDR   R4, =random_value           
-  LDR   R6, [R4]                    @ // random_value
+  LDR   R6, [R4]                    @   // random_value
 
-  CMP   R5, R6
+  CMP   R5, R6                      @   if (i < random_value) {
   BGE   .LresetGame                 @ 
 
   LDR   R4, =random_lights
-  LDR   R7, [R4, R5, LSL #2]        @ get current light offset
+  LDR   R7, [R4, R5, LSL #2]        @       get current light offset
   ADD   R7, R7, #LD4_PIN            @
 
-  MOV   R6, #1                  @ get current light bit
+  MOV   R6, #1                      @       get current light bit
   LSL   R6, R6, R7                  @ 
 
-  BL    clear_lights            @ clear_lights()
+  BL    clear_lights                @       clear_lights()
 
-  LDR   R4, =GPIOE_ODR
+  LDR   R4, =GPIOE_ODR              @
   LDR   R5, [R4]
-  ORR   R5, R6                  @ turn on current light
-  STR   R5, [R4]                @
+  ORR   R5, R6                      @       turn on current light
+  STR   R5, [R4]                    @
 
-  LDR   R4, =i
-  LDR   R5, [R4]
-  ADD   R5, R5, #1
-  STR   R5, [R4]
-  B     .LskipResetGame
-.LresetGame:
-  LDR   R4, =i
-  MOV   R5, #0
-  STR   R5, [R4]
+  LDR   R4, =i                      @
+  LDR   R5, [R4]                    @
+  ADD   R5, R5, #1                  @       i += 1
+  STR   R5, [R4]                    @
+  B     .LskipResetGame             @
+.LresetGame:                        @   } else {
+  LDR   R4, =i                      @       i = 0
+  MOV   R5, #0                      @
+  STR   R5, [R4]                    @
 
-  BL    clear_lights            @ clear_lights()
+  BL    clear_lights                @       clear_lights()
 
-  LDR   R4, =game_started
-  MOV   R5, #0
-  STR   R5, [R4]
-
-  LDR   R4, =waiting_for_user
-  MOV   R5, #1
-  STR   R5, [R4]
-
-  LDR   R4, =pressed_time
-  MOV   R5, #0
-  STR   R5, [R4]
-
-  LDR   R4, =sleep_countdown
-  LDR   R5, =SLEEP_PERIOD
-  STR   R5, [R4]
-.LskipResetGame:
-  LDR   R4, =blink_countdown      @   countdown = BLINK_PERIOD;
-  LDR   R6, =round_n
-  LDR   R6, [R6]
-  MOV   R5, #100
-  MUL   R6, R5, R6
-  LDR   R5, =BLINK_PERIOD         @
-  SUB   R5, R5, R6
-  CMP   R5, #100
-  BGE   .LendIfTooFast
-  MOV   R5, #100
-.LendIfTooFast:
-  STR   R5, [R4]                  @
-
+  LDR   R4, =game_started           @       game_started = 0
+  MOV   R5, #0                      @
+  STR   R5, [R4]                    @
+                                    @
+  LDR   R4, =waiting_for_user       @       waiting_for_user = true 
+  MOV   R5, #1                      @
+  STR   R5, [R4]                    @
+                                    @
+  LDR   R4, =pressed_time           @       pressed_time = 0
+  MOV   R5, #0                      @
+  STR   R5, [R4]                    @
+                                    @
+  LDR   R4, =sleep_countdown        @       sleep_countdown = SLEEP_PERIOD
+  LDR   R5, =SLEEP_PERIOD           @
+  STR   R5, [R4]                    @
+.LskipResetGame:                    @   }
+  LDR   R4, =blink_countdown        @
+  LDR   R6, =round_n                @  
+  LDR   R6, [R6]                    @
+  MOV   R5, #100                  @     blink_countdown = BLINK_PERIOD - round_n * 100
+  MUL   R6, R5, R6                  @
+  LDR   R5, =BLINK_PERIOD           @
+  SUB   R5, R5, R6                  @
+  CMP   R5, #100                  @     if (blink_countdown < 100 {
+  BGE   .LendIfTooFast              @       blink_coundown = 100
+  MOV   R5, #100                  @     }
+.LendIfTooFast:                     @
+  STR   R5, [R4]                    @
+                                    @
 .LendIfDelay:                       @ }
 
 .LretSystick:
@@ -352,40 +351,40 @@ EXTI0_IRQHandler:
   CMP   R5, #0                      @ if (!button_is_pressed) {
   BNE   .LnotReset
 
-  LDR   R6, =waiting_for_user
-  LDR   R7, [R6]
-  CMP   R7, #1
-  BNE   .LendIfWaiting
-
-  EOR   R5, #1
-  STR   R5, [R4]
-
-  LDR   R4, =button_count           @ count = count + 1
+  LDR   R6, =waiting_for_user       @   if (waiting_for_user) {
+  LDR   R7, [R6]                    @
+  CMP   R7, #1                      @
+  BNE   .LendIfWaiting              @
+                                    @
+  EOR   R5, #1                      @       button_is_pressed = false
+  STR   R5, [R4]                    @
+                                    @
+  LDR   R4, =button_count           @       button_count = button_count + 1
   LDR   R5, [R4]                    @
   ADD   R5, R5, #1                  @
   STR   R5, [R4]                    @
-  B     .LretButtonHandler
-.LendIfWaiting:
+  B     .LretButtonHandler          @       return
+.LendIfWaiting:                     @   }
 
-  LDR   R6, =pressed_time
-  MOV   R7, #0
+  LDR   R6, =pressed_time           @
+  MOV   R7, #0                      @
   STR   R7, [R6]                    @   pressed_time = 0
 .LnotReset:                         @ }
 
-  LDR   R6, =waiting_for_user
-  LDR   R7, [R6]
-  CMP   R7, #1
+  LDR   R6, =waiting_for_user       @ if (waiting_for_user) {
+  LDR   R7, [R6]                    @
+  CMP   R7, #1                      @
 
-  EOR   R5, #1                      @ button_is_pressed = !button_is_pressed
-  STR   R5, [R4]
-  BEQ   .LretButtonHandler
-
-  LDR   R4, =SYSTICK_VAL
-  LDR   R5, [R4]
-  AND   R5, R5, #7                  @ random_value = (random_value % 8) + 5
-  ADD   R5, R5, #5
-  LDR   R4, =random_value
-  STR   R5, [R4]
+  EOR   R5, #1                      @   button_is_pressed = !button_is_pressed
+  STR   R5, [R4]                    @
+  BEQ   .LretButtonHandler          @   return
+                                    @ }
+  LDR   R4, =SYSTICK_VAL            @
+  LDR   R5, [R4]                    @
+  AND   R5, R5, #7                  @ random_value = (SYSTICK_VAL % 8) + 5
+  ADD   R5, R5, #5                  @
+  LDR   R4, =random_value           @
+  STR   R5, [R4]                    @
   
 .LretButtonHandler:
   LDR   R4, =EXTI_PR                @ Clear (acknowledge) the interrupt
@@ -395,16 +394,19 @@ EXTI0_IRQHandler:
   @ Return from interrupt handler
   POP  {R4-R7,PC}
 
+
+@ turn off all lights
 clear_lights:
   PUSH {R4-R6,LR}
 
   LDR   R4, =GPIOE_ODR
   LDR   R5, [R4]
-  LDR   R6, =0xff00             @ turn off all lights
+  LDR   R6, =0xff00             
   BIC   R5, R6
   STR   R5, [R4]
 
   POP  {R4-R6,PC}
+@ glows green
 glow_win:
   PUSH  {R4-R5,LR}
 
@@ -415,6 +417,7 @@ glow_win:
   STR   R5, [R4]
 
   POP   {R4-R5,PC}
+@ glows red
 glow_lose:
   PUSH  {R4-R5,LR}
 
@@ -425,13 +428,14 @@ glow_lose:
   STR   R5, [R4]
 
   POP   {R4-R5,PC}
+@ shows the current round number
 glow_round_number:
   PUSH  {R4-R6,LR}
 
   BL    clear_lights
   LDR   R4, =round_n
   LDR   R6, [R4]
-  RSB   R6, R6, #6
+  RSB   R6, R6, #7
 
   CMP   R6, #0
   BGE   .LendIfLargeRound
@@ -450,6 +454,7 @@ glow_round_number:
 
   POP   {R4-R6,PC}
 
+@ resets everything after waiting for user input
 reset_awaiting_answer:
   PUSH  {R4-R5,LR}
 
@@ -465,6 +470,8 @@ reset_awaiting_answer:
 
   POP   {R4-R5,PC}
 
+@ decreases answer_countdown and shows time left using lights
+@ also checks if user won and glows correspondingly
 wait_for_user:
   PUSH  {R4-R6,LR}
 
@@ -479,6 +486,7 @@ wait_for_user:
 
   LDR   R6, =BLINK_PERIOD_ANSWER
   UDIV  R6, R5, R6
+  ADD   R6, R6, #1
   LDR   R4, =circle_bit_patterns
   LDRH  R6, [R4, R6, LSL#1]
   
@@ -513,6 +521,7 @@ wait_for_user:
   .section .data
   
 circle_bit_patterns:
+  .hword 0b0000000000000000
   .hword 0b0000010000000000
   .hword 0b0000110000000000
   .hword 0b0001110000000000

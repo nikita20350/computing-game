@@ -1,5 +1,5 @@
 # LINK TO TEAM VIDEO
-# https://
+# https://media.heanet.ie/page/8a8b5a3a448b433aa6b81df23c6f7ca7
 
   .syntax unified
   .cpu cortex-m4
@@ -356,7 +356,7 @@ EXTI0_IRQHandler:
   CMP   R7, #1                      @
   BNE   .LendIfWaiting              @
                                     @
-  EOR   R5, #1                      @       button_is_pressed = false
+  EOR   R5, #1                      @       button_is_pressed = !button_is_pressed
   STR   R5, [R4]                    @
                                     @
   LDR   R4, =button_count           @       button_count = button_count + 1
